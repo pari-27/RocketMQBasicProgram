@@ -1,45 +1,47 @@
 package main
 
 import (
-	"context"
-	"fmt"
 	"os"
-	"strconv"
 
-	"github.com/apache/rocketmq-client-go/v2"
-	"github.com/apache/rocketmq-client-go/v2/primitive"
-	"github.com/apache/rocketmq-client-go/v2/producer"
+	"github.com/urfave/cli"
 )
 
 func main() {
-	p, _ := rocketmq.NewProducer(
-		producer.WithGroupName("firstTestGroup"),
-		producer.WithNsResovler(primitive.NewPassthroughResolver([]string{"127.0.0.1:9876"})),
-		producer.WithRetry(2),
-	)
-	err := p.Start()
-	if err != nil {
-		fmt.Printf("start producer error: %s", err.Error())
-		os.Exit(1)
-	}
-	fmt.Println("success")
-	topic := "P1SelfTest"
+	cliApp := cli.NewApp()
+	cliApp.Name = "PRODUCER"
+	cliApp.Version = "1.0.0"
+	cliApp.Commands = []cli.Command{
+		{
+			Name:  "start",
+			Usage: "start consumer [--type {simple|async|batch} --topic]",
+			Flags: []cli.Flag{
+				&cli.StringFlag{
+					Name:  "type",
+					Value: "simple",
+					Usage: "Choose the consume type simple|orderly|broadcast",
+				},
+				&cli.StringFlag{
+					Name:  "topic",
+					Value: "simple",
+					Usage: "insert a topic name",
+				},
+			},
+			Action: func(c *cli.Context) (err error) {
+				switch c.String("type") {
+				case "simple":
+					err = Simple(c.String("topic"))
+				case "async":
+					err = Async(c.String("topic"))
+				case "tag":
+					err = Tag(c.String("topic"))
 
-	for i := 0; i < 2; i++ {
-		msg := &primitive.Message{
-			Topic: topic,
-			Body:  []byte("Hello RocketMQ Go Client! " + strconv.Itoa(i)),
-		}
-		res, err := p.SendSync(context.Background(), msg)
-
-		if err != nil {
-			fmt.Printf("send message error: %s\n", err)
-		} else {
-			fmt.Printf("send message success: result=%s\n", res.String())
-		}
+				}
+				if err != nil {
+					return
+				}
+				return nil
+			},
+		},
 	}
-	err = p.Shutdown()
-	if err != nil {
-		fmt.Printf("shutdown producer error: %s", err.Error())
-	}
+	cliApp.Run(os.Args)
 }

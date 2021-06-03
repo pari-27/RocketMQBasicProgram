@@ -1,41 +1,46 @@
 package main
 
 import (
-	"context"
-	"fmt"
 	"os"
-	"time"
 
-	"github.com/apache/rocketmq-client-go/v2"
-	"github.com/apache/rocketmq-client-go/v2/consumer"
-	"github.com/apache/rocketmq-client-go/v2/primitive"
+	"github.com/urfave/cli"
 )
 
 func main() {
-	c, _ := rocketmq.NewPushConsumer(
-		consumer.WithGroupName("firstTestGroup"),
-		consumer.WithNsResovler(primitive.NewPassthroughResolver([]string{"127.0.0.1:9876"})),
-	)
-	err := c.Subscribe("P1SelfTest", consumer.MessageSelector{}, func(ctx context.Context,
-		msgs ...*primitive.MessageExt) (consumer.ConsumeResult, error) {
-		for i := range msgs {
-			fmt.Printf("subscribe callback: %v \n", msgs[i])
-		}
-
-		return consumer.ConsumeSuccess, nil
-	})
-	if err != nil {
-		fmt.Println(err.Error())
+	cliApp := cli.NewApp()
+	cliApp.Name = "CONSUMER"
+	cliApp.Version = "1.0.0"
+	cliApp.Commands = []cli.Command{
+		{
+			Name:  "start",
+			Usage: "start [--type {simple|orderly|broadcast} --topic]",
+			Flags: []cli.Flag{
+				&cli.StringFlag{
+					Name:  "type",
+					Value: "simple",
+					Usage: "Choose the consume type simple|orderly|broadcast",
+				},
+				&cli.StringFlag{
+					Name:  "topic",
+					Value: "simple",
+					Usage: "insert a topic name",
+				},
+			},
+			Action: func(c *cli.Context) (err error) {
+				switch c.String("type") {
+				case "simple":
+					err = Simple(c.String("topic"))
+				case "tag":
+					err = Tag(c.String("topic"))
+				case "broadcast":
+					err = Broadcast(c.String("topic"))
+				}
+				if err != nil {
+					return
+				}
+				return nil
+			},
+		},
 	}
-	// Note: start after subscribe
-	err = c.Start()
-	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(-1)
-	}
-	time.Sleep(time.Hour)
-	err = c.Shutdown()
-	if err != nil {
-		fmt.Printf("shutdown Consumer error: %s", err.Error())
-	}
+	cliApp.Run(os.Args)
 }
